@@ -1,0 +1,65 @@
+/* Container voor alle groepen */
+.wc-iro-groups-wrapper {
+    margin: 10px 0;
+    padding: 0;
+    white-space: nowrap; /* opties naast elkaar */
+    overflow-x: auto;    /* horizontaal scrollbaar als te veel opties */
+}
+
+/* Elke optie */
+.wc-iro-option {
+    display: inline-block;
+    margin: 2px;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    width: 45px; /* compacte breedte */
+    box-sizing: border-box;
+    vertical-align: top;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+/* Hover effect */
+.wc-iro-option:hover {
+    border-color: #888;
+}
+
+/* Specifiek voor onze radio-optie afbeeldingen */
+.wc-iro-option img.wc-iro-image {
+    width: 30px !important;
+    height: 30px !important;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto 2px auto;
+    max-width: none !important; /* voorkomt override door thema */
+}
+/* Label en prijs */
+.wc-iro-label {
+    display: block;
+    font-size: 0.6em;
+    color: #333;
+    margin-top: 1px;
+    line-height: 1em;
+}
+
+.wc-iro-price {
+    display: block;
+    font-size: 0.55em;
+    color: #555;
+    margin-bottom: 2px;
+    line-height: 1em;
+}
+
+/* Radio knop onderaan */
+.wc-iro-option input[type="radio"] {
+    display: block;
+    margin: 2px auto 0 auto;
+}
+
+/* Visueel geselecteerde optie */
+.wc-iro-option input[type="radio"]:checked + img {
+    border: 2px solid #0071a1;
+    border-radius: 4px;
+}
