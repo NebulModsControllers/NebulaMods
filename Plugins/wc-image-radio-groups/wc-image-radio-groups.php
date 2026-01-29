@@ -15,7 +15,10 @@ function wc_iro_enqueue_admin_assets()
 {
     // Note: 'assets/css/style.css' and 'assets/js/script.js' are referenced but not included here.
     // Ensure these files exist in your plugin structure.
-    wp_enqueue_style('wc-iro-style', plugin_dir_url(__FILE__) . 'assets/css/style.css');
+    $admin_css_rel  = 'assets/css/style.css';
+    $admin_css_file = plugin_dir_path(__FILE__) . $admin_css_rel;
+    $admin_css_ver  = file_exists($admin_css_file) ? filemtime($admin_css_file) : null;
+    wp_enqueue_style('wc-iro-style', plugin_dir_url(__FILE__) . $admin_css_rel, array(), $admin_css_ver);
     wp_enqueue_media();
     wp_enqueue_script('wc-iro-script', plugin_dir_url(__FILE__) . 'assets/js/script.js', array('jquery'), null, true);
 }
@@ -427,15 +430,39 @@ add_action('wp_footer', 'wc_iro_refresh_on_minicart_open_astra_fix', 999);
 function wc_iro_enqueue_frontend_assets()
 {
     if (is_product()) {
-        // Aangezien je momenteel de CSS inline hebt, is dit deel nu optioneel.
-        // Als je het CSS-bestand (frontend.css) gaat gebruiken, laat je dit staan:
-        wp_enqueue_style('wc-iro-frontend', plugin_dir_url(__FILE__) . 'assets/css/frontend.css');
+        // CSS is now in a file; use filemtime() to bust caches reliably.
+        $frontend_css_rel  = 'assets/css/frontend.css';
+        $frontend_css_file = plugin_dir_path(__FILE__) . $frontend_css_rel;
+        $frontend_css_ver  = file_exists($frontend_css_file) ? filemtime($frontend_css_file) : null;
+        wp_enqueue_style('wc-iro-frontend', plugin_dir_url(__FILE__) . $frontend_css_rel, array(), $frontend_css_ver);
+
         wp_enqueue_script('wc-iro-frontend', plugin_dir_url(__FILE__) . 'assets/js/frontend.js', array('jquery'), null, true);
     }
 }
-// Door de prioriteit te verhogen naar 99, zorgen we dat de CSS van deze plugin 
-// NA de meeste thema-stijlen (die standaard op 10 laden) wordt geladen.
-add_action('wp_enqueue_scripts', 'wc_iro_enqueue_frontend_assets', 99);
+// Load late so theme CSS is less likely to override ours.
+add_action('wp_enqueue_scripts', 'wc_iro_enqueue_frontend_assets', 999);
+
+/**
+ * Preload our frontend stylesheet to reduce render-blocking.
+ * Note: this can cause a small FOUC on slow connections, but improves LCP.
+ */
+function wc_iro_preload_frontend_stylesheet($html, $handle, $href, $media)
+{
+    if (is_admin()) {
+        return $html;
+    }
+
+    if ($handle !== 'wc-iro-frontend') {
+        return $html;
+    }
+
+    $href_esc = esc_url($href);
+    $media_esc = $media ? esc_attr($media) : 'all';
+
+    return "<link rel='preload' as='style' href='{$href_esc}' onload=\"this.onload=null;this.rel='stylesheet'\" />\n"
+        . "<noscript><link rel='stylesheet' href='{$href_esc}' media='{$media_esc}' /></noscript>\n";
+}
+add_filter('style_loader_tag', 'wc_iro_preload_frontend_stylesheet', 10, 4);
 
 // ================= Display Options Frontend =================
 /**
@@ -662,210 +689,6 @@ function wc_iro_display_image_options()
 
     // Inline CSS + JS
     ?>
-    <style>
-        /* NIEUWE FIX: Forceer de optie-wrapper om de volledige breedte in te nemen 
-           en op een nieuwe regel te beginnen na de knop. */
-        .wc-iro-options-wrapper {
-            /* Dwingt het element om zich als een blok te gedragen (start nieuwe regel) */
-            display: block !important;
-
-            /* Zorgt ervoor dat het de volledige beschikbare breedte inneemt */
-            width: 100% !important;
-
-            /* Zorgt dat het niet meezweeft met de knop */
-            clear: both !important;
-
-            /* Ruimte tussen de knop en de opties */
-            margin-top: 15px !important;
-        }
-
-        /* Zorg dat de summary box er ook onder komt */
-        #wc-iro-summary {
-            display: block !important;
-            width: 100% !important;
-        }
-
-        /* 1. Algemene Opmaak */
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-group>.wc-iro-group-title {
-            font-weight: 700 !important;
-            margin-top: 0 !important;
-            margin-bottom: 4px !important;
-        }
-
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-group {
-            margin-bottom: 10px !important;
-        }
-
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-options {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            gap: 10px !important;
-            margin-top: 0 !important;
-        }
-
-        /* 2. Basis Radio/Optie Styling */
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-option {
-            cursor: pointer;
-            display: flex;
-            position: relative;
-            transition: all 0.2s ease !important;
-        }
-
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-option input[type=radio] {
-            position: absolute;
-            left: -9999px;
-        }
-
-        /* 3. Styling voor GEDEACTIVEERDE opties */
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-option-disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-
-        /* 4. Styling voor AFBEELDING-opties */
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-option:not(.wc-iro-no-image) {
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            gap: 4px !important;
-            min-width: 80px;
-        }
-
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-image-wrap {
-            width: 80px !important;
-            height: 80px !important;
-            border: 2px solid #ccc !important;
-            border-radius: 10px !important;
-            overflow: hidden !important;
-            transition: all 0.2s ease !important;
-        }
-
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-image-wrap img {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover !important;
-            display: block !important;
-        }
-
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-option:hover .wc-iro-image-wrap {
-            border-color: #888 !important;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2) !important;
-        }
-
-        /* 4b. Highlight voor AFBEELDING: Alleen de image-wrap krijgt de highlight */
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-option input[type=radio]:checked+.wc-iro-image-wrap {
-            border-color: #0071a1 !important;
-            box-shadow: 0 0 8px rgba(0, 113, 161, 0.6) !important;
-        }
-
-
-        /* 5. Styling voor TEKST-opties (wc-iro-no-image) */
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-no-image {
-            min-width: unset;
-            padding: 8px 12px;
-            border: 2px solid #ccc !important;
-            border-radius: 10px !important;
-            flex-direction: row;
-            align-items: center;
-        }
-
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-no-image .wc-iro-price {
-            font-size: 0.8em;
-        }
-
-        /* 5b. Highlight voor TEKST-optie: De hele label/container krijgt de highlight */
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-no-image:hover {
-            border-color: #888 !important;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2) !important;
-        }
-
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-no-image:has(input[type=radio]:checked) {
-            border-color: #0071a1 !important;
-            box-shadow: 0 0 8px rgba(0, 113, 161, 0.6) !important;
-        }
-
-        /* 5c. FIX: Reset ALLE tekst-elementen binnen de geselecteerde tekst-label. */
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-no-image:has(input[type=radio]:checked) .wc-iro-label,
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-no-image:has(input[type=radio]:checked) .wc-iro-price,
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-no-image input[type=radio]:checked~.wc-iro-label,
-        .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-no-image input[type=radio]:checked~.wc-iro-price {
-            color: inherit !important;
-            font-weight: normal !important;
-        }
-
-        /* ================================================================= */
-        /* == NIEUWE CSS VOOR HET ONDER ELKAAR PLAATSEN VAN DE VOORRAADSTATUS == */
-        /* ================================================================= */
-
-        /* 7. Nieuwe regel voor Voorraadstatus (wc-iro-label-wrap is de container) */
-        .ast-woocommerce-container .wc-iro-label-wrap {
-            display: flex;
-            flex-direction: column;
-            /* Dwingt de elementen onder elkaar */
-            align-items: center;
-        }
-
-        /* Standaard opmaak voor de voorraadstatus */
-        .ast-woocommerce-container .wc-iro-stock-status {
-            font-size: 0.85em;
-            /* Kleiner lettertype voor de status */
-            font-weight: 500;
-            margin-top: 2px;
-            text-transform: capitalize;
-            /* Zorgt voor nette weergave */
-        }
-
-        /* Optioneel: Kleuren toevoegen per status */
-        .ast-woocommerce-container .wc-iro-stock-status.backorder {
-            color: #ff8c00;
-            /* Oranje-achtig voor Nabestelling */
-        }
-
-        .ast-woocommerce-container .wc-iro-stock-status.sold-out {
-            color: #cc0000;
-            /* Rood voor Uitverkocht */
-        }
-
-        .ast-woocommerce-container .wc-iro-stock-status.in-stock {
-            color: #008000;
-            /* Groen voor Op voorraad */
-        }
-
-        /* FIX voor de tekst-opties om label/prijs/status op 1 regel te houden */
-        .ast-woocommerce-container .wc-iro-no-image .wc-iro-label-wrap {
-            flex-direction: row;
-            gap: 5px;
-        }
-
-        .ast-woocommerce-container .wc-iro-no-image .wc-iro-stock-status {
-            margin-top: 0;
-        }
-
-        /* ================================================================= */
-        /* == EINDE VAN DE VOORRAADSTATUS CSS == */
-        /* ================================================================= */
-
-
-        /* 6. Samenvatting en Overzicht Styling (Aangepast voor uitlijning) */
-        .ast-woocommerce-container #wc-iro-summary {
-            margin: 0 0 10px 0 !important;
-            padding: 8px !important;
-            border: 1px solid #ddd !important;
-            border-radius: 6px !important;
-            font-size: 14px !important;
-        }
-
-        .ast-woocommerce-container #wc-iro-summary .wc-iro-summary-list {
-            list-style: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        .ast-woocommerce-container #wc-iro-summary .wc-iro-summary-list li {
-            margin: 2px 0 !important;
-        }
-    </style>
     <script>
         jQuery(function ($) {
             var $priceEl = $('.summary .price').first();
