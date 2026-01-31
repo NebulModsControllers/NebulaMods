@@ -87,38 +87,16 @@ jQuery(function($) {
         // Dit is meestal al de standaard actie van WooCommerce na een succesvolle AJAX add-to-cart.
         // U kunt refreshCartFragments() hier optioneel toevoegen voor de zekerheid.
     });
+
+    // Handle Astra minicart fragment refresh (from wcIroSettings)
+    if (typeof wcIroSettings !== 'undefined' && wcIroSettings.minicart_selectors) {
+        var selectors = wcIroSettings.minicart_selectors.join(', ');
+        $(document).on('click', selectors, function() {
+            $('body').trigger('wc_fragment_refresh');
+        });
+    }
     
     // Initialiseer bij laden
     var initialAdjustment = calculateTotalPriceAdjustment();
     updateProductPriceDisplay(initialAdjustment);
-    
-    // Na het eerste laden van de pagina, verversen we de cart fragments.
-    // Dit zorgt ervoor dat de mini-cart de correcte prijs toont als de pagina al geladen was.
-    // refreshCartFragments();
 });
-
-/**
- * Past de basisprijs van het product aan met de iro_price_adjustment.
- * Dit zorgt ervoor dat de prijs in de cart-sessie correct is.
- */
-function wc_iro_adjust_price_in_cart($cart) {
-    if (is_admin() && !defined('DOING_AJAX')) {
-        return;
-    }
-    if (did_action('woocommerce_before_calculate_totals') >= 2) {
-        return;
-    }
-    
-    foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
-        if (isset($cart_item['iro_price_adjustment']) && $cart_item['iro_price_adjustment'] > 0) {
-            $adjustment = floatval($cart_item['iro_price_adjustment']);
-            $product = $cart_item['data'];
-            $base_price = $product->get_regular_price('edit');
-            $new_price = $base_price + $adjustment;
-            
-            // Dit is cruciaal voor de totale berekening, ook in fragments
-            $cart_item['data']->set_price($new_price);
-        }
-    }
-}
-add_action('woocommerce_before_calculate_totals', 'wc_iro_adjust_price_in_cart', 100, 1);

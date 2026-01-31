@@ -11,18 +11,8 @@ if (!defined('ABSPATH'))
     exit;
 
 // ================= Admin Assets =================
-function wc_iro_enqueue_admin_assets()
-{
-    // Note: 'assets/css/style.css' and 'assets/js/script.js' are referenced but not included here.
-    // Ensure these files exist in your plugin structure.
-    $admin_css_rel  = 'assets/css/style.css';
-    $admin_css_file = plugin_dir_path(__FILE__) . $admin_css_rel;
-    $admin_css_ver  = file_exists($admin_css_file) ? filemtime($admin_css_file) : null;
-    wp_enqueue_style('wc-iro-style', plugin_dir_url(__FILE__) . $admin_css_rel, array(), $admin_css_ver);
-    wp_enqueue_media();
-    wp_enqueue_script('wc-iro-script', plugin_dir_url(__FILE__) . 'assets/js/script.js', array('jquery'), null, true);
-}
-add_action('admin_enqueue_scripts', 'wc_iro_enqueue_admin_assets');
+// Only the product edit page enqueue happens in wc_iro_enqueue_admin_scripts below
+// Empty placeholder files (assets/css/style.css, assets/js/script.js) are no longer enqueued
 
 function wc_iro_enqueue_admin_scripts($hook)
 {
@@ -50,6 +40,29 @@ function wc_iro_enqueue_admin_scripts($hook)
 }
 // Koppel de functie aan de juiste WordPress actie
 add_action('admin_enqueue_scripts', 'wc_iro_enqueue_admin_scripts');
+
+
+/**
+ * Consolidate Astra Fontello fixes to reduce resource chains
+ */
+function wc_iro_fix_astra_fontello() {
+    // Dequeue and deregister broken Astra fontello CSS
+    wp_dequeue_style('astra-icon-fonts');
+    wp_deregister_style('astra-icon-fonts');
+    
+    // Inject fixed @font-face with swap display for better performance
+    wp_add_inline_style('wp-content', "
+        @font-face {
+            font-family: 'fontello';
+            src: url('/wp-content/themes/astra/assets/fonts/fontello.woff2?86892455') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+    ");
+}
+add_action('wp_enqueue_scripts', 'wc_iro_fix_astra_fontello', 20);
+
 
 // ================= Taxonomy =================
 function wc_iro_register_group_taxonomy()
@@ -394,75 +407,34 @@ add_action('created_iro_group_assignment', 'wc_iro_save_group_options', 10, 2);
 // ================= Frontend Assets =================
 
 /**
- * Dwingt een cart fragment refresh af wanneer de Astra minicart-trigger wordt geklikt.
- * Dit is nodig om aangepaste prijzen direct na toevoegen/openen correct te tonen.
+ * Enqueue minicart fragment helper settings for frontend.js
  */
-function wc_iro_refresh_on_minicart_open_astra_fix() {
+function wc_iro_enqueue_minicart_handler() {
     if (is_product() || is_front_page() || is_shop() || is_cart() || is_checkout()) {
-        ?>
-        <script type="text/javascript">
-            jQuery(document).ready(function($) {
-                // De Astra-specifieke selector voor de minicart-knop, inclusief de container die je gaf
-                // We luisteren naar een klik op het icoon of de telling/prijs.
-                var minicart_trigger = $(
-                    '.ast-site-header-cart, ' + // De algemene container
-                    '.ast-cart-menu-wrap, ' +    // De wrapper
-                    '.cart-contents'             // De standaard WooCommerce/Astra inhoud link
-                );
-                
-                minicart_trigger.on('click', function(e) {
-                    // Triggert de update van alle WooCommerce fragmenten (inclusief minicart)
-                    // Let op: Sommige Astra-implementaties gebruiken 'wc_fragment_refresh'
-                    // maar het 'click'-event triggert dit soms al.
-                    // Het forceren is de veiligste methode:
-                    $(document.body).trigger('wc_fragment_refresh');
-                    
-                    // console.log('Astra Mini-cart click gedetecteerd. Fragment refresh getriggerd.');
-                });
-            });
-        </script>
-        <?php
+        wp_localize_script('wc-iro-frontend', 'wcIroSettings', array(
+            'minicart_selectors' => array(
+                '.ast-site-header-cart',
+                '.ast-cart-menu-wrap',
+                '.cart-contents'
+            )
+        ));
     }
 }
-// Gebruik een hoge prioriteit om zeker te zijn dat dit script na jQuery laadt
-add_action('wp_footer', 'wc_iro_refresh_on_minicart_open_astra_fix', 999);
+add_action('wp_enqueue_scripts', 'wc_iro_enqueue_minicart_handler', 11);
 
-function wc_iro_enqueue_frontend_assets()
-{
+function wc_iro_enqueue_frontend_assets() {
     if (is_product()) {
-        // CSS is now in a file; use filemtime() to bust caches reliably.
         $frontend_css_rel  = 'assets/css/frontend.css';
         $frontend_css_file = plugin_dir_path(__FILE__) . $frontend_css_rel;
-        $frontend_css_ver  = file_exists($frontend_css_file) ? filemtime($frontend_css_file) : null;
+        $frontend_css_ver  = file_exists($frontend_css_file) ? filemtime($frontend_css_file) : '1.0';
+        
+        // Load with standard enqueue, no preload filter needed
         wp_enqueue_style('wc-iro-frontend', plugin_dir_url(__FILE__) . $frontend_css_rel, array(), $frontend_css_ver);
-
         wp_enqueue_script('wc-iro-frontend', plugin_dir_url(__FILE__) . 'assets/js/frontend.js', array('jquery'), null, true);
     }
 }
-// Load late so theme CSS is less likely to override ours.
-add_action('wp_enqueue_scripts', 'wc_iro_enqueue_frontend_assets', 999);
+add_action('wp_enqueue_scripts', 'wc_iro_enqueue_frontend_assets');
 
-/**
- * Preload our frontend stylesheet to reduce render-blocking.
- * Note: this can cause a small FOUC on slow connections, but improves LCP.
- */
-function wc_iro_preload_frontend_stylesheet($html, $handle, $href, $media)
-{
-    if (is_admin()) {
-        return $html;
-    }
-
-    if ($handle !== 'wc-iro-frontend') {
-        return $html;
-    }
-
-    $href_esc = esc_url($href);
-    $media_esc = $media ? esc_attr($media) : 'all';
-
-    return "<link rel='preload' as='style' href='{$href_esc}' onload=\"this.onload=null;this.rel='stylesheet'\" />\n"
-        . "<noscript><link rel='stylesheet' href='{$href_esc}' media='{$media_esc}' /></noscript>\n";
-}
-add_filter('style_loader_tag', 'wc_iro_preload_frontend_stylesheet', 10, 4);
 
 // ================= Display Options Frontend =================
 /**
@@ -637,6 +609,8 @@ function wc_iro_display_image_options()
                 if (!$isDisabled && !$first_active_selected) {
                     $checked_attr = ' checked="checked"';
                     $first_active_selected = true; // Markeer dat de eerste is geselecteerd
+                    // Accumulate server-side initial options price to be used for pre-rendering the total
+                    $server_initial_options_price += $price;
                 }
 
 
@@ -648,7 +622,7 @@ function wc_iro_display_image_options()
 
                 // Image wrap
                 if ($has_image) {
-                    echo '<div class="wc-iro-image-wrap"><img src="' . $image . '" alt="' . $label . '"></div>';
+                    echo '<div class="wc-iro-image-wrap"><img src="' . $image . '" alt="' . $label . '" width="80" height="80"></div>';
                 }
 
                 // === LABEL WRAPPER VOOR TEKST ===
@@ -695,6 +669,16 @@ function wc_iro_display_image_options()
             if (!$priceEl.length) $priceEl = $('.price').first();
             var $summaryList = $('#wc-iro-summary .wc-iro-summary-list');
 
+            // Server provided initial prices (pre-rendered to prevent CLS)
+            var serverBasePrice = parseFloat('<?php echo esc_js( number_format( floatval($product->get_price()), 2, '.', '' ) ); ?>') || 0;
+            var serverOptionsPrice = parseFloat('<?php echo esc_js( number_format( floatval($server_initial_options_price), 2, '.', '' ) ); ?>') || 0;
+
+            // If base price data is not present yet, set it from server and pre-render the visible total
+            if (!$priceEl.data('wc-iro-base-price')) {
+                $priceEl.data('wc-iro-base-price', serverBasePrice);
+                setPriceBdi($priceEl, formatCurrency(serverBasePrice + serverOptionsPrice));
+            }
+
             function parsePriceText(t) {
                 if (!t) return 0;
                 t = String(t).trim().replace(/[^\d\.,\-]/g, '');
@@ -726,6 +710,18 @@ function wc_iro_display_image_options()
                 return '€' + (num.toFixed(2)).replace('.', ',');
             }
 
+            // Helper to set structured <bdi> with separate currency and amount spans
+            function setPriceBdi($target, formattedStr) {
+                var currency = formattedStr.charAt(0) || '€';
+                var amount = formattedStr.slice(1) || formattedStr;
+                var html = '<bdi><span class="wc-iro-currency">' + currency + '</span><span class="wc-iro-amount">' + amount + '</span></bdi>';
+                if ($target.find('bdi').length) {
+                    $target.find('bdi').first().replaceWith(html);
+                } else {
+                    $target.empty().append(html);
+                }
+            }
+
             // Store the base price if not already stored
             if (!$priceEl.data('wc-iro-base-price')) {
                 $priceEl.data('wc-iro-base-price', parsePriceText($priceEl.text()));
@@ -753,14 +749,11 @@ function wc_iro_display_image_options()
 
                 var total = basePrice + optionsPrice;
 
-                // Update the main product price
-                var $bdi = $priceEl.find('bdi').first();
+                // Update the main product price (only update numeric part to avoid DOM reflow)
                 var formattedTotal = formatCurrency(total);
-                if ($bdi.length) {
-                    $bdi.text(formattedTotal);
-                } else {
-                    $priceEl.text(formattedTotal);
-                }
+
+                // Ensure we update/create a structured <bdi> (currency + amount) to keep layout stable
+                setPriceBdi($priceEl, formattedTotal);
 
                 // Update the summary list
                 $summaryList.empty();
@@ -919,3 +912,34 @@ function wc_iro_add_custom_price_data($cart_item_data, $product_id) {
     return $cart_item_data;
 }
 add_filter('woocommerce_add_cart_item_data', 'wc_iro_add_custom_price_data', 10, 2);
+
+/**
+ * Persist selected iro options to order line items so they appear in admin, emails and packing slips
+ * - Adds human-readable "Iro Option" meta lines (Group: Label (+€x)) per selected option
+ * - Adds raw JSON `_iro_options` and numeric `_iro_price_adjustment` meta for programmatic access
+ */
+function wc_iro_add_order_item_meta( $item, $cart_item_key, $values, $order ) {
+    if ( isset( $values['iro_options'] ) && is_array( $values['iro_options'] ) ) {
+        $total_adjustment = 0;
+        foreach ( $values['iro_options'] as $option ) {
+            $price = floatval( $option['price'] ?? 0 );
+            $price_display = $price > 0 ? ' (+' . number_format( $price, 2, ',', '.' ) . ')' : '';
+            $label = sprintf('%s: %s%s', $option['group'] ?? 'Optie', $option['label'] ?? '', $price_display);
+
+            // Add a readable meta line for each option (multiple meta entries with same key will show as separate lines)
+            $item->add_meta_data( 'Iro Option', $label, false );
+
+            $total_adjustment += $price;
+        }
+
+        // Save raw JSON for programmatic use
+        $item->add_meta_data( '_iro_options', wp_json_encode( $values['iro_options'] ), true );
+
+        // Save numeric total adjustment and formatted price
+        $item->add_meta_data( '_iro_price_adjustment', $total_adjustment, true );
+        if ( $total_adjustment > 0 ) {
+            $item->add_meta_data( 'Iro price adjustment', number_format( $total_adjustment, 2, ',', '.' ), true );
+        }
+    }
+}
+add_action( 'woocommerce_checkout_create_order_line_item', 'wc_iro_add_order_item_meta', 10, 4 );
