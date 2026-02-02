@@ -27,7 +27,15 @@
 #wc-iro-summary {
     display: block !important;
     width: 100% !important;
-    min-height: 40px; /* Voorkomt verspringen als samenvatting verschijnt */
+    min-height: 145px; /* Voorbehouden ruimte voor prijsoverzicht (prevents CLS) - reserveer voor title + 5+ items */
+    margin-top: 10px !important;
+    margin-bottom: 10px !important;
+    padding: 12px !important;
+    background-color: #f9f9f9;
+    border-left: 3px solid #0071a1;
+    border-radius: 3px;
+    contain: layout style;
+    box-sizing: border-box;
 }
 
 /* 1. Algemene Opmaak */
@@ -150,7 +158,12 @@
 }
 
 /* Make sure the summary has reserved height (prevents jump when items are added) */
-#wc-iro-summary { min-height: 48px; }
+#wc-iro-summary { 
+    min-height: 75px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+}
 
 /* Ensure option image wrappers reserve space */
 .ast-woocommerce-container .wc-iro-options-wrapper .wc-iro-image-wrap {
@@ -321,4 +334,86 @@
     text-align: right;
 }
 
+/* ============================================================
+   CLS Fix: Reserve space for summary list
+   - Prevent layout shift when summary items are added/removed
+   ============================================================ */
 
+#wc-iro-summary strong {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #333;
+}
+
+#wc-iro-summary .wc-iro-summary-list {
+    list-style: none;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 110px; /* Reserve space for 5+ items */
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+#wc-iro-summary .wc-iro-summary-list li {
+    padding: 1px 0;
+    margin: 0 !important;
+    font-size: 0.95em;
+    line-height: 1.3;
+    color: #333;
+    min-height: 1.3em; /* Reserve space for each line */
+}
+
+/* ============================================================
+   ASTRA MENU CLS FIX - Prevent menu reflow from vertical to horizontal
+   ============================================================ */
+
+/* Stabilize Astra header navigation to prevent CLS */
+.ast-header-navigation {
+    contain: layout style paint !important;
+    min-height: 50px;
+}
+
+/* Prevent Astra menu wrapping and vertical layout */
+.ast-header-navigation .main-navigation {
+    contain: layout !important;
+    min-height: 50px;
+}
+
+/* Stabilize the menu list itself */
+.ast-header-navigation .main-navigation ul {
+    min-height: 50px !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+}
+
+/* Reserve space for menu items */
+.ast-header-navigation .main-navigation li {
+    min-height: 50px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Ensure font-display is swap for system fonts */
+@font-face {
+    font-family: 'Astra System Font';
+    src: system-ui, -apple-system, sans-serif;
+    font-display: swap;
+}
+
+/* Header container should also reserve space */
+.ast-header-wrap {
+    min-height: 50px !important;
+    contain: layout !important;
+}
+
+/* Stabilize top header bar if it exists */
+.ast-mobile-header-content {
+    contain: layout style !important;
+}
+
+#wc-iro-summary .wc-iro-summary-list li strong {
+    font-weight: 600;
+    display: inline;
+}
