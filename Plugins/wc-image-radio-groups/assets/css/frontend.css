@@ -365,54 +365,6 @@
     min-height: 1.3em; /* Reserve space for each line */
 }
 
-/* ============================================================
-   ASTRA MENU CLS FIX - Prevent menu reflow from vertical to horizontal
-   ============================================================ */
-
-/* Stabilize Astra header navigation to prevent CLS */
-.ast-header-navigation {
-    contain: layout style paint !important;
-    min-height: 50px;
-}
-
-/* Prevent Astra menu wrapping and vertical layout */
-.ast-header-navigation .main-navigation {
-    contain: layout !important;
-    min-height: 50px;
-}
-
-/* Stabilize the menu list itself */
-.ast-header-navigation .main-navigation ul {
-    min-height: 50px !important;
-    display: flex !important;
-    flex-wrap: nowrap !important;
-}
-
-/* Reserve space for menu items */
-.ast-header-navigation .main-navigation li {
-    min-height: 50px !important;
-    display: flex !important;
-    align-items: center !important;
-}
-
-/* Ensure font-display is swap for system fonts */
-@font-face {
-    font-family: 'Astra System Font';
-    src: system-ui, -apple-system, sans-serif;
-    font-display: swap;
-}
-
-/* Header container should also reserve space */
-.ast-header-wrap {
-    min-height: 50px !important;
-    contain: layout !important;
-}
-
-/* Stabilize top header bar if it exists */
-.ast-mobile-header-content {
-    contain: layout style !important;
-}
-
 #wc-iro-summary .wc-iro-summary-list li strong {
     font-weight: 600;
     display: inline;

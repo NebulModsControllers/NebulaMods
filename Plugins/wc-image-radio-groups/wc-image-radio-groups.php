@@ -65,141 +65,38 @@ add_action('wp_enqueue_scripts', 'wc_iro_fix_astra_fontello', 20);
 
 
 /**
- * FIX ASTRA MENU CLS - Prevent menu from reflow (vertical to horizontal)
- * Only apply constraints at larger breakpoint where menu items fit
+ * FIX ASTRA MENU CLS - Responsive header height and menu visibility
  */
 function wc_iro_fix_astra_menu_cls() {
-    // Inject critical CSS to stabilize menu and prevent CLS
+    // Inject critical CSS for header stability and responsive menu
     wp_add_inline_style('wp-content', "
-        /* Large desktop only (1200px+): Stabilize menu when fully rendered */
-        @media (min-width: 1200px) {
-            .ast-header-navigation {
-                contain: layout style paint !important;
-                min-height: 50px;
-            }
-            
-            .ast-header-navigation .main-navigation {
-                contain: layout !important;
-                min-height: 50px;
-            }
-            
-            .ast-header-navigation .main-navigation ul {
-                min-height: 50px !important;
-                display: flex !important;
-            }
-            
-            .ast-header-navigation .main-navigation li {
-                min-height: 50px !important;
-                display: flex !important;
-                align-items: center !important;
-            }
-            
+        /* Mobile-first: smaller header for mobile (improves LCP/FCP) */
+        @media (max-width: 768px) {
             .ast-header-wrap {
-                min-height: 50px !important;
-                contain: layout !important;
-            }
-            /* Reserve horizontal space for the site title to prevent letter-stacking */
-            /* Targets common Astra/site-title selectors; use nowrap + min-width to avoid vertical stacking */
-            .site-title,
-            .ast-site-identity .site-title,
-            .ast-header-break-point .site-title,
-            .site-branding .site-title,
-            .ast-site-identity a {
-                display: inline-block !important;
-                white-space: nowrap !important;
-                min-width: 220px !important;
-                max-width: 36vw !important;
+                max-height: 60px !important;
                 overflow: hidden !important;
-                text-overflow: ellipsis !important;
-                vertical-align: middle !important;
-            }
-        }
-
-        /* Additional protection: ensure site identity (brand/logo/title) uses a horizontal flex layout
-           and reserve stable space early to prevent stacking or column layout before theme CSS applies. */
-        .ast-site-identity,
-        .site-branding,
-        .ast-site-identity .site-title-wrap,
-        .ast-site-identity .site-title {
-            display: flex !important;
-            flex-direction: row !important;
-            align-items: center !important;
-            white-space: nowrap !important;
-            flex: 0 0 auto !important;
-            min-width: 180px !important;
-            max-width: 44vw !important;
-            overflow: hidden !important;
-        }
-
-        /* If the site title is a link, keep it on one line and truncate if needed */
-        .ast-site-identity .site-title a,
-        .site-branding .site-title a {
-            display: inline-block !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            max-width: 100% !important;
-        }
-        
-        /* Below 1200px: Allow natural responsive behavior (but reserve title space to avoid stacking) */
-        @media (max-width: 1199px) {
-            .ast-header-navigation,
-            .ast-header-navigation .main-navigation,
-            .ast-header-wrap {
-                contain: none !important;
-                min-height: auto !important;
-            }
-
-            .ast-header-navigation .main-navigation ul {
-                flex-wrap: wrap !important;
-            }
-
-            /* Mobile / narrow-desktop: prevent site title letters from stacking vertically
-               while still allowing the header to remain responsive. Use a smaller min-width
-               so the title truncates with ellipsis rather than stacking. */
-            .site-title,
-            .ast-site-identity .site-title,
-            .ast-header-break-point .site-title,
-            .site-branding .site-title,
-            .ast-site-identity a {
-                display: inline-block !important;
-                white-space: nowrap !important;
-                min-width: 120px !important;
-                max-width: 70vw !important;
-                overflow: hidden !important;
-                text-overflow: ellipsis !important;
-                vertical-align: middle !important;
+                contain: layout style !important;
             }
         }
         
-        /* Stabilize mobile menu if present */
-        .ast-mobile-header-content {
-            contain: layout style !important;
+        /* Desktop: normal header height */
+        @media (min-width: 769px) {
+            .ast-header-wrap {
+                max-height: 80px !important;
+                overflow: hidden !important;
+                contain: layout style !important;
+            }
+        }
+        
+        /* Hide main menu below 549px, let hamburger menu show */
+        @media (max-width: 548px) {
+            .site-header-primary-section-center {
+                display: none !important;
+            }
         }
     ");
 }
 add_action('wp_enqueue_scripts', 'wc_iro_fix_astra_menu_cls', 10);
-
-/**
- * Print very-small critical CSS in <head> to reserve space for logo + site title
- * This runs early (priority 1) so the browser has the rules before first paint.
- */
-function wc_iro_print_critical_title_css() {
-    echo "<style id=\"wc-iro-critical-title-css\">\n";
-    echo ".ast-site-identity, .site-branding { display: flex !important; align-items: center !important; }\n";
-    echo ".site-logo-img { display: inline-block !important; width: 70px !important; min-width: 70px !important; }\n";
-    echo ".site-logo-img img { max-width: 70px !important; max-height: 60px !important; width: auto !important; height: auto !important; display: block !important; }\n";
-    echo "/* Force header not to exceed 80px to avoid CLS caused by expansion */\n";
-    echo "#ast-desktop-header, .ast-primary-header-bar, .ast-main-header-wrap, .site-primary-header-wrap, .main-header-bar-wrap, .ast-header-wrap {\n";
-    echo "    max-height: 80px !important;\n";
-    echo "    overflow: hidden !important;\n";
-    echo "    align-items: center !important;\n";
-    echo "}\n";
-    echo ".ast-site-title-wrap, .site-title { display: inline-block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 140px !important; }\n";
-    echo "@media (max-width: 1199px) { .ast-site-title-wrap, .site-title { min-width: 100px !important; max-width: 70vw !important; } }\n";
-    echo "</style>\n";
-}
-add_action('wp_head', 'wc_iro_print_critical_title_css', 1);
 
 
 // ================= Taxonomy =================
