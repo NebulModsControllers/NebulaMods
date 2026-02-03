@@ -369,3 +369,82 @@
     font-weight: 600;
     display: inline;
 }
+
+/* ============================================================
+   WooCommerce Gallery: Reserve space for main image + thumbnails
+   - Prevents layout shift when images load or when thumbnails are present below
+   - Targets default WooCommerce gallery structure and common thumbnail containers
+   ============================================================ */
+
+.woocommerce-product-gallery {
+    /* Ensure the gallery occupies block layout so reserved heights apply */
+    display: block;
+}
+
+.woocommerce-product-gallery__wrapper {
+    /* Reserve a reasonable minimum height for the main image area */
+    min-height: 420px; /* desktop fallback; responsive rules follow */
+    position: relative;
+    box-sizing: border-box;
+    background-color: #fff;
+}
+
+.woocommerce-product-gallery__image {
+    width: 100%;
+    min-height: 360px; /* ensures the main photo has reserved vertical space */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #fff;
+}
+
+.woocommerce-product-gallery__image img,
+.woocommerce-product-gallery__image picture img {
+    max-width: 100%;
+    max-height: 100%;
+    height: auto;
+    width: auto;
+    object-fit: contain;
+    display: block;
+}
+
+/* Thumbnails row when shown below the main image */
+.woocommerce-product-gallery .flex-control-thumbs {
+    display: flex !important;
+    gap: 8px;
+    margin-top: 12px;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+    min-height: 64px; /* reserve height for the thumbnail row */
+}
+
+.flex-control-thumbs li {
+    width: 64px;
+    height: 64px;
+    overflow: hidden;
+    border-radius: 6px;
+    border: 1px solid #eee;
+    display: inline-block;
+    box-sizing: border-box;
+}
+
+.flex-control-thumbs img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+@media (max-width: 1024px) {
+    .woocommerce-product-gallery__wrapper { min-height: 360px; }
+    .woocommerce-product-gallery__image { min-height: 300px; }
+}
+
+@media (max-width: 768px) {
+    .woocommerce-product-gallery__wrapper { min-height: 320px; }
+    .woocommerce-product-gallery__image { min-height: 240px; }
+    .flex-control-thumbs li { width: 48px; height: 48px; }
+}
+

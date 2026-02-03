@@ -46,12 +46,19 @@ add_action('admin_enqueue_scripts', 'wc_iro_enqueue_admin_scripts');
  * Consolidate Astra Fontello fixes to reduce resource chains
  */
 function wc_iro_fix_astra_fontello() {
+    // Only run these fixes when the active theme is Astra (avoid breaking other themes)
+    $template = wp_get_theme()->get_template();
+    if ($template !== 'astra') {
+        return;
+    }
+
     // Dequeue and deregister broken Astra fontello CSS
     wp_dequeue_style('astra-icon-fonts');
     wp_deregister_style('astra-icon-fonts');
-    
+
     // Inject fixed @font-face with swap display for better performance
-    wp_add_inline_style('wp-content', "
+    // Attach inline style to a reliable handle if Astra styles are present; fall back gracefully
+    wp_add_inline_style('astra-theme-css', "
         @font-face {
             font-family: 'fontello';
             src: url('/wp-content/themes/astra/assets/fonts/fontello.woff2?86892455') format('woff2');
@@ -68,8 +75,14 @@ add_action('wp_enqueue_scripts', 'wc_iro_fix_astra_fontello', 20);
  * FIX ASTRA MENU CLS - Responsive header height and menu visibility
  */
 function wc_iro_fix_astra_menu_cls() {
+    // Only apply these styles when Astra is the active theme
+    $template = wp_get_theme()->get_template();
+    if ($template !== 'astra') {
+        return;
+    }
+
     // Inject critical CSS for header stability and responsive menu
-    wp_add_inline_style('wp-content', "
+    wp_add_inline_style('astra-theme-css', "
         /* Mobile-first: smaller header for mobile (improves LCP/FCP) */
         @media (max-width: 768px) {
             .ast-header-wrap {
