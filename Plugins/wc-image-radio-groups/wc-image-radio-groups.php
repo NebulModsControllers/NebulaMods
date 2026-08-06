@@ -697,14 +697,16 @@ function wc_iro_display_image_options()
             if (!$priceEl.length) $priceEl = $('.price').first();
             var $summaryList = $('#wc-iro-summary .wc-iro-summary-list');
 
-            // Server provided initial prices (pre-rendered to prevent CLS)
-            var serverBasePrice = parseFloat('<?php echo esc_js( number_format( floatval($product->get_price()), 2, '.', '' ) ); ?>') || 0;
+            // Server provided initial prices (sale and regular) to avoid relying on DOM parsing.
+            var serverBaseSalePrice = parseFloat('<?php echo esc_js( number_format( floatval($product->get_price()), 2, '.', '' ) ); ?>') || 0;
+            var serverBaseRegularPrice = parseFloat('<?php echo esc_js( number_format( floatval($product->get_regular_price()), 2, '.', '' ) ); ?>') || 0;
             var serverOptionsPrice = parseFloat('<?php echo esc_js( number_format( floatval($server_initial_options_price), 2, '.', '' ) ); ?>') || 0;
 
-            // If base price data is not present yet, set it from server and pre-render the visible total
-            if (!$priceEl.data('wc-iro-base-price')) {
-                $priceEl.data('wc-iro-base-price', serverBasePrice);
-                setPriceBdi($priceEl, formatCurrency(serverBasePrice + serverOptionsPrice));
+            if (!$priceEl.data('wc-iro-base-sale-price')) {
+                $priceEl.data('wc-iro-base-sale-price', serverBaseSalePrice);
+            }
+            if (!$priceEl.data('wc-iro-base-regular-price')) {
+                $priceEl.data('wc-iro-base-regular-price', serverBaseRegularPrice);
             }
 
             function parsePriceText(t) {
@@ -743,20 +745,40 @@ function wc_iro_display_image_options()
                 var currency = formattedStr.charAt(0) || '€';
                 var amount = formattedStr.slice(1) || formattedStr;
                 var html = '<bdi><span class="wc-iro-currency">' + currency + '</span><span class="wc-iro-amount">' + amount + '</span></bdi>';
-                if ($target.find('bdi').length) {
-                    $target.find('bdi').first().replaceWith(html);
-                } else {
-                    $target.empty().append(html);
+                if ($target.length) {
+                    $target.html(html);
                 }
             }
 
+            function getSalePriceText($target) {
+                var $saleAmount = $target.find('ins .woocommerce-Price-amount').first();
+                if ($saleAmount.length) {
+                    return $saleAmount.text();
+                }
+                return $target.find('.woocommerce-Price-amount').first().text() || $target.text();
+            }
+
+            function getOriginalPriceText($target) {
+                var $originalAmount = $target.find('del .woocommerce-Price-amount').first();
+                return $originalAmount.length ? $originalAmount.text() : '';
+            }
+
             // Store the base price if not already stored
-            if (!$priceEl.data('wc-iro-base-price')) {
-                $priceEl.data('wc-iro-base-price', parsePriceText($priceEl.text()));
+            if (!$priceEl.data('wc-iro-base-sale-price')) {
+                $priceEl.data('wc-iro-base-sale-price', parsePriceText(getSalePriceText($priceEl)));
+            }
+            if (!$priceEl.data('wc-iro-base-regular-price')) {
+                var originalText = getOriginalPriceText($priceEl);
+                if (originalText) {
+                    $priceEl.data('wc-iro-base-regular-price', parsePriceText(originalText));
+                } else {
+                    $priceEl.data('wc-iro-base-regular-price', parseFloat($priceEl.data('wc-iro-base-sale-price')) || 0);
+                }
             }
 
             function updateSummary() {
-                var basePrice = parseFloat($priceEl.data('wc-iro-base-price')) || 0;
+                var baseSalePrice = parseFloat($priceEl.data('wc-iro-base-sale-price')) || 0;
+                var baseRegularPrice = parseFloat($priceEl.data('wc-iro-base-regular-price')) || null;
                 var optionsPrice = 0;
                 var selected = [];
 
@@ -775,17 +797,29 @@ function wc_iro_display_image_options()
                     selected.push({ label: label, price: price });
                 });
 
-                var total = basePrice + optionsPrice;
+                var total = baseSalePrice + optionsPrice;
+                var totalRegular = null;
+                if (baseRegularPrice !== null && baseRegularPrice > 0) {
+                    totalRegular = baseRegularPrice + optionsPrice;
+                }
 
-                // Update the main product price (only update numeric part to avoid DOM reflow)
-                var formattedTotal = formatCurrency(total);
+                // Update the main product price section
+                var $insAmount = $priceEl.find('ins .woocommerce-Price-amount').first();
+                var $delAmount = $priceEl.find('del .woocommerce-Price-amount').first();
+                var $singleAmount = $priceEl.find('.woocommerce-Price-amount').first();
 
-                // Ensure we update/create a structured <bdi> (currency + amount) to keep layout stable
-                setPriceBdi($priceEl, formattedTotal);
+                if ($delAmount.length) {
+                    setPriceBdi($delAmount, formatCurrency(totalRegular || total));
+                }
+                if ($insAmount.length) {
+                    setPriceBdi($insAmount, formatCurrency(total));
+                } else if ($singleAmount.length) {
+                    setPriceBdi($singleAmount, formatCurrency(total));
+                }
 
                 // Update the summary list
                 $summaryList.empty();
-                $summaryList.append('<li>Basisprijs: ' + formatCurrency(basePrice) + '</li>');
+                $summaryList.append('<li>Basisprijs: ' + formatCurrency(baseSalePrice) + '</li>');
                 if (selected.length) {
                     selected.forEach(function (s) {
                         var priceText = '';
