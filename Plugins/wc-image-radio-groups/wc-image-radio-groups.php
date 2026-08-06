@@ -113,6 +113,7 @@ function wc_iro_add_controller_specific_fields()
 
             // Haal de opgeslagen waarde op, default naar 'no'
             $current_hide_value = $current_override['hide'] ?? 'no';
+            $current_disabled_value = $current_override['disabled'] ?? 'no';
 
             // 1. Verberg Optie (Checkbox FIXED)
             echo '<p class="form-field ' . esc_attr($safe_field_id_base) . '_hide_field">';
@@ -121,7 +122,16 @@ function wc_iro_add_controller_specific_fields()
             echo '<span class="description">' . __('Verberg deze optie op DIT product.', 'text-domain') . '</span>';
             echo '</p>';
 
-            // 2. Proxy ID Override
+            // 2. Maak optie uitgeschakeld op dit product (blijft zichtbaar, maar grijs + niet klikbaar)
+            echo '<p class="form-field ' . esc_attr($safe_field_id_base) . '_disabled_field">';
+            echo '<label for="' . esc_attr($safe_field_id_base) . '_disabled" style="display:inline-flex; align-items:center; gap:8px;">';
+            echo '<input type="checkbox" id="' . esc_attr($safe_field_id_base) . '_disabled" name="' . esc_attr($field_name_base) . '[disabled]" value="yes" ' . checked($current_disabled_value, 'yes', false) . ' /> ';
+            echo __('Maak uitgeschakeld op dit product', 'text-domain');
+            echo '</label>';
+            echo '<span class="description">' . __('Toont de optie wel, maar in grijs en niet meer klikbaar.', 'text-domain') . '</span>';
+            echo '</p>';
+
+            // 3. Proxy ID Override
             woocommerce_wp_text_input(array(
                 // Cruciaal: Gebruik de veilige ID hier voor het HTML ID attribuut
                 'id' => $safe_field_id_base . '_proxy_id',
@@ -180,20 +190,22 @@ function wc_iro_save_controller_specific_fields($post_id)
             // Als 'hide' in de ingediende velden zit, dan is deze aangevinkt ('yes').
             // Zo niet, dan is deze NIET aangevinkt ('no').
             $hide_status = isset($fields['hide']) ? 'yes' : 'no';
+            $disabled_status = isset($fields['disabled']) ? 'yes' : 'no';
 
-            // We slaan alleen de override op als er data is ingevuld OF als de checkbox actief (aangevinkt) is.
+            // We slaan alleen de override op als er data is ingevuld OF als een van de checkboxes actief is.
             if (
                 !empty($fields['proxy_id']) ||
                 !empty($fields['img_id']) ||
-                $hide_status === 'yes' // Sla op als deze is aangevinkt
+                $hide_status === 'yes' ||
+                $disabled_status === 'yes'
             ) {
                 $data_to_save[$uid] = [
-                    // De CORRECTE opslag van de checkbox status
                     'hide' => $hide_status,
+                    'disabled' => $disabled_status,
                     'proxy_id' => sanitize_text_field($fields['proxy_id'] ?? ''),
                     'img_id' => sanitize_text_field($fields['img_id'] ?? ''),
                 ];
-            } else if (empty($fields['proxy_id']) && empty($fields['img_id']) && $hide_status === 'no') {
+            } else if (empty($fields['proxy_id']) && empty($fields['img_id']) && $hide_status === 'no' && $disabled_status === 'no') {
                 // Als de status 'no' is EN de andere velden zijn leeg, verwijderen we de override (niets opslaan).
                 continue;
             }
@@ -450,7 +462,7 @@ add_filter('script_loader_tag', function($tag, $handle) {
 function wc_iro_final_cart_item_price_fix($price_html, $cart_item, $cart_item_key) {
     
     // Controleer of onze prijsaanpassing aanwezig is
-    if (isset($cart_item['iro_price_adjustment']) && $cart_item['iro_price_adjustment'] > 0) {
+    if (isset($cart_item['iro_price_adjustment']) && floatval($cart_item['iro_price_adjustment']) !== 0) {
         
         $adjustment = floatval($cart_item['iro_price_adjustment']);
         $product = $cart_item['data'];
@@ -530,13 +542,19 @@ function wc_iro_display_image_options()
                     continue; // Slaat deze optie over en gaat naar de volgende
                 }
 
-                // 2. Proxy ID Override
+                // 2. Product-specifieke disabled override (laat de optie zien, maar grijs en niet klikbaar)
+                $disabled_override = (($override['disabled'] ?? 'no') === 'yes');
+                if ($disabled_override) {
+                    $isDisabled = true;
+                }
+
+                // 3. Proxy ID Override
                 $proxy_product_id_final = intval($option['proxy_id'] ?? 0);
                 if (!empty($override['proxy_id'])) {
                     $proxy_product_id_final = intval($override['proxy_id']);
                 }
 
-                // 3. Afbeelding Override
+                // 4. Afbeelding Override
                 $img_id_final = intval($option['img_id'] ?? 0);
                 if (!empty($override['img_id'])) {
                     $img_id_final = intval($override['img_id']);
@@ -600,6 +618,11 @@ function wc_iro_display_image_options()
                 // STAP 5: RENDERING (GECORRIGEERD VOOR EERSTE SELECTIE)
                 // ===============================================
 
+                if ($disabled_override) {
+                    $isDisabled = true;
+                    $stock_status = 'sold-out';
+                }
+
                 // Finaliseer de Klassen en Attributen
                 $disabled_class = $isDisabled ? ' wc-iro-option-disabled' : '';
                 $class = 'wc-iro-option' . $disabled_class . ($has_image ? '' : ' wc-iro-no-image');
@@ -636,8 +659,9 @@ function wc_iro_display_image_options()
                 echo '<span class="wc-iro-label">' . $label . '</span>';
 
                 // Price
-                if ($price > 0) {
-                    echo '<span class="wc-iro-price">(+€' . number_format($price, 2, ',', '') . ')</span>';
+                if (abs(floatval($price)) > 0) {
+                    $sign = $price > 0 ? '+' : '-';
+                    echo '<span class="wc-iro-price">(' . $sign . '€' . number_format(abs($price), 2, ',', '') . ')</span>';
                 }
 
                 // VOORRAADSTATUS OP EEN NIEUWE REGEL
@@ -764,8 +788,11 @@ function wc_iro_display_image_options()
                 $summaryList.append('<li>Basisprijs: ' + formatCurrency(basePrice) + '</li>');
                 if (selected.length) {
                     selected.forEach(function (s) {
-                        // Only show price adjustment if > 0
-                        var priceText = s.price > 0 ? '+' + formatCurrency(s.price) : '';
+                        var priceText = '';
+                        if (s.price !== 0) {
+                            var absPrice = Math.abs(s.price);
+                            priceText = (s.price > 0 ? '+' : '-') + formatCurrency(absPrice);
+                        }
                         $summaryList.append('<li>' + $('<div/>').text(s.label).html() + ': ' + priceText + '</li>');
                     });
                 } else {
@@ -849,7 +876,12 @@ function wc_iro_display_cart_item_options($item_data, $cart_item)
 {
     if (isset($cart_item['iro_options'])) {
         foreach ($cart_item['iro_options'] as $option) {
-            $price_display = $option['price'] > 0 ? ' (+€' . number_format($option['price'], 2, ',', '.') . ')' : '';
+            $price_display = '';
+            $price = floatval($option['price'] ?? 0);
+            if (abs($price) > 0) {
+                $sign = $price > 0 ? '+' : '-';
+                $price_display = ' (' . $sign . '€' . number_format(abs($price), 2, ',', '.') . ')';
+            }
             $item_data[] = array('name' => $option['group'], 'value' => $option['label'] . $price_display);
         }
     }
@@ -927,7 +959,11 @@ function wc_iro_add_order_item_meta( $item, $cart_item_key, $values, $order ) {
         $total_adjustment = 0;
         foreach ( $values['iro_options'] as $option ) {
             $price = floatval( $option['price'] ?? 0 );
-            $price_display = $price > 0 ? ' (+' . number_format( $price, 2, ',', '.' ) . ')' : '';
+            $price_display = '';
+            if (abs( $price ) > 0) {
+                $sign = $price > 0 ? '+' : '-';
+                $price_display = ' (' . $sign . '€' . number_format( abs( $price ), 2, ',', '.' ) . ')';
+            }
             $label = sprintf('%s: %s%s', $option['group'] ?? 'Optie', $option['label'] ?? '', $price_display);
 
             // Add a readable meta line for each option (multiple meta entries with same key will show as separate lines)
@@ -941,7 +977,7 @@ function wc_iro_add_order_item_meta( $item, $cart_item_key, $values, $order ) {
 
         // Save numeric total adjustment and formatted price
         $item->add_meta_data( '_iro_price_adjustment', $total_adjustment, true );
-        if ( $total_adjustment > 0 ) {
+        if ( $total_adjustment !== 0 ) {
             $item->add_meta_data( 'Iro price adjustment', number_format( $total_adjustment, 2, ',', '.' ), true );
         }
     }
