@@ -42,74 +42,7 @@ function wc_iro_enqueue_admin_scripts($hook)
 add_action('admin_enqueue_scripts', 'wc_iro_enqueue_admin_scripts');
 
 
-/**
- * Consolidate Astra Fontello fixes to reduce resource chains
- */
-function wc_iro_fix_astra_fontello() {
-    // Only run these fixes when the active theme is Astra (avoid breaking other themes)
-    $template = wp_get_theme()->get_template();
-    if ($template !== 'astra') {
-        return;
-    }
 
-    // Dequeue and deregister broken Astra fontello CSS
-    wp_dequeue_style('astra-icon-fonts');
-    wp_deregister_style('astra-icon-fonts');
-
-    // Inject fixed @font-face with swap display for better performance
-    // Attach inline style to a reliable handle if Astra styles are present; fall back gracefully
-    wp_add_inline_style('astra-theme-css', "
-        @font-face {
-            font-family: 'fontello';
-            src: url('/wp-content/themes/astra/assets/fonts/fontello.woff2?86892455') format('woff2');
-            font-weight: normal;
-            font-style: normal;
-            font-display: swap;
-        }
-    ");
-}
-add_action('wp_enqueue_scripts', 'wc_iro_fix_astra_fontello', 20);
-
-
-/**
- * FIX ASTRA MENU CLS - Responsive header height and menu visibility
- */
-function wc_iro_fix_astra_menu_cls() {
-    // Only apply these styles when Astra is the active theme
-    $template = wp_get_theme()->get_template();
-    if ($template !== 'astra') {
-        return;
-    }
-
-    // Inject critical CSS for header stability and responsive menu
-    wp_add_inline_style('astra-theme-css', "
-        /* Mobile-first: smaller header for mobile (improves LCP/FCP) */
-        @media (max-width: 768px) {
-            .ast-header-wrap {
-                max-height: 60px !important;
-                overflow: hidden !important;
-                contain: layout style !important;
-            }
-        }
-        
-        /* Desktop: normal header height */
-        @media (min-width: 769px) {
-            .ast-header-wrap {
-                max-height: 80px !important;
-                overflow: hidden !important;
-                contain: layout style !important;
-            }
-        }
-        
-        /* Hide main menu below 549px, let hamburger menu show */
-        @media (max-width: 548px) {
-            .site-header-primary-section-center {
-                display: none !important;
-            }
-        }
-    ");
-}
-add_action('wp_enqueue_scripts', 'wc_iro_fix_astra_menu_cls', 10);
 
 
 // ================= Taxonomy =================
@@ -454,21 +387,7 @@ add_action('created_iro_group_assignment', 'wc_iro_save_group_options', 10, 2);
 
 // ================= Frontend Assets =================
 
-/**
- * Enqueue minicart fragment helper settings for frontend.js
- */
-function wc_iro_enqueue_minicart_handler() {
-    if (is_product() || is_front_page() || is_shop() || is_cart() || is_checkout()) {
-        wp_localize_script('wc-iro-frontend', 'wcIroSettings', array(
-            'minicart_selectors' => array(
-                '.ast-site-header-cart',
-                '.ast-cart-menu-wrap',
-                '.cart-contents'
-            )
-        ));
-    }
-}
-add_action('wp_enqueue_scripts', 'wc_iro_enqueue_minicart_handler', 11);
+
 
 function wc_iro_enqueue_frontend_assets() {
     if (is_product()) {
@@ -482,6 +401,45 @@ function wc_iro_enqueue_frontend_assets() {
     }
 }
 add_action('wp_enqueue_scripts', 'wc_iro_enqueue_frontend_assets');
+
+/**
+ * Preload main product image and add preconnect hints to speed up LCP on product pages
+ */
+function wc_iro_preload_product_image_and_hints() {
+    if (!is_product()) {
+        return;
+    }
+
+    global $product;
+    if (empty($product) || !method_exists($product, 'get_image_id')) {
+        return;
+    }
+
+    $img_id = $product->get_image_id();
+    if ($img_id) {
+        $img_url = wp_get_attachment_image_url($img_id, 'large');
+        if ($img_url) {
+            // Preload hero image
+            echo '<link rel="preload" as="image" href="' . esc_url($img_url) . '" crossorigin />';
+        }
+    }
+
+    // Preconnect common analytics/gtm domains to reduce DNS/TCP/TLS latency
+    echo '<link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />';
+    echo '<link rel="preconnect" href="https://www.google-analytics.com" crossorigin />';
+}
+add_action('wp_head', 'wc_iro_preload_product_image_and_hints', 1);
+
+// Ensure our frontend script is marked defer to avoid blocking parsing/execution
+add_filter('script_loader_tag', function($tag, $handle) {
+    if ($handle === 'wc-iro-frontend') {
+        // Add defer attribute if not present
+        if (stripos($tag, ' defer') === false) {
+            $tag = str_replace('<script ', '<script defer ', $tag);
+        }
+    }
+    return $tag;
+}, 10, 2);
 
 
 // ================= Display Options Frontend =================
@@ -614,19 +572,16 @@ function wc_iro_display_image_options()
 
                             if ($proxy_product->backorders_allowed()) {
                                 // Nabestelling toegestaan
-                                $stock_label = ' (Nabestelling)';
                                 $isDisabled = false;
                                 $stock_status = 'backorder';
 
                             } else {
                                 // Uitverkocht
                                 $isDisabled = true;
-                                $stock_label = ' (Uitverkocht)';
                                 $stock_status = 'sold-out';
                             }
                         } else {
                             // Product is op voorraad (voorraad > 0)
-                            $stock_label = ' (Op voorraad)';
                             $stock_status = 'in-stock';
                             $isDisabled = $original_is_disabled;
                         }
@@ -670,7 +625,8 @@ function wc_iro_display_image_options()
 
                 // Image wrap
                 if ($has_image) {
-                    echo '<div class="wc-iro-image-wrap"><img src="' . $image . '" alt="' . $label . '" width="80" height="80"></div>';
+                    // Add loading="lazy" and explicit width/height to help LCP and avoid layout shift
+                    echo '<div class="wc-iro-image-wrap"><img loading="lazy" src="' . $image . '" alt="' . $label . '" width="80" height="80"></div>';
                 }
 
                 // === LABEL WRAPPER VOOR TEKST ===

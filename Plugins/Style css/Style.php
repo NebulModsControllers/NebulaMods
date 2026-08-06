@@ -25,6 +25,36 @@ function mijn_wc_inline_stijlen() {
            DEEL 2: Productkaarten Omhoog Halen (Alleen opschonen)
            ================================================================= */
         
+        /* HEADER: Reserve space and avoid CLS when menu loads (prevents vertical/double menus)
+           - Reserves header height so late-inserted menu won't push content.
+           - Keeps nav horizontal before JS runs and hides cloned menus by default.
+        */
+        .site-header, .masthead, header#masthead {
+             min-height: 72px;
+             height: 72px;
+             box-sizing: border-box;
+        }
+        .site-header .main-navigation, .main-navigation {
+             display: flex !important;
+             align-items: center;
+             justify-content: space-between;
+             flex-wrap: nowrap;
+        }
+        /* Keep the menu invisible until JS marks the page ready to avoid FOUC/CLS */
+        .main-navigation .menu, .site-header .menu {
+             transition: opacity 0.18s ease;
+             opacity: 0;
+             pointer-events: none;
+        }
+        .js-menu-ready .main-navigation .menu, .js-menu-ready .site-header .menu {
+             opacity: 1;
+             pointer-events: auto;
+        }
+        /* Hide commonly used clone classes if a plugin/theme creates a duplicate menu */
+        .main-navigation .cloned, .main-navigation .clone, .main-navigation .menu-clone {
+             display: none !important;
+        }
+
         /* Minimaliseert de marge van de container boven de productlijst */
         .woocommerce .woocommerce-notices,
         .woocommerce ul.products {
@@ -37,29 +67,34 @@ function mijn_wc_inline_stijlen() {
              background: #ffffff;
              border-radius: 12px;
              padding: 12px;
-             transition: all 0.15s ease;
-             box-shadow: 0 0 0 rgba(0, 128, 128, 0);
+             box-shadow: 0 12px 28px rgba(0, 128, 128, 0.08);
              border: 1px solid rgba(0, 128, 128, 0.1);
+             transform: translateZ(0);
+             transition: transform 0.15s ease, box-shadow 0.12s ease;
+             will-change: box-shadow, transform;
         }
         
         
         /* PRODUCT IMAGE FLOAT + GLOW */
         .woocommerce ul.products li.product img {
-             transition: all 0.3s ease;
+             transition: transform 0.3s ease, filter 0.3s ease;
+             will-change: transform, filter;
         }
         .woocommerce ul.products li.product:hover img {
-             transform: translateY(-5px);
+             transform: translateY(-3px);
              filter: drop-shadow(0 0 10px rgba(0, 128, 128, 0.7));
         }
         
         @keyframes softPulse {
-             0% { box-shadow: 0 0 8px rgba(0, 128, 128, 0.7); }
-             50% { box-shadow: 0 0 18px rgba(0, 128, 128, 0.7); }
-             100% { box-shadow: 0 0 8px rgba(0, 128, 128, 0.7); }
+             0%, 100% { box-shadow: 0 0 18px 4px rgba(0, 128, 128, 0.22); }
+             50% { box-shadow: 0 0 26px 6px rgba(0, 128, 128, 0.30); }
         }
         
         .woocommerce ul.products li.product:hover {
-             animation: softPulse 4s infinite ease-in-out;
+             transform: translateY(-4px);
+             animation: softPulse 2s infinite ease-in-out;
+             box-shadow: 0 0 22px 5px rgba(0, 128, 128, 0.38), 0 16px 32px rgba(0, 128, 128, 0.18);
+             border-color: rgba(0, 128, 128, 0.25);
         }
         
         
@@ -73,14 +108,7 @@ function mijn_wc_inline_stijlen() {
              display: none; 
         }
         
-        /* Targets the Astra primary navigation dropdowns */
-        .main-navigation .menu-item-has-children .sub-menu {
-             /* Sets a solid background color (e.g., solid white) */
-             background-color: #18004A; 
-              
-             /* Ensures the background isn't translucent due to opacity settings */
-             opacity: 1;
-        }
+
         
         
         /* Minimaliseert de marge ONDER de Astra Voorraad/Beschikbaarheid detail. */
@@ -120,37 +148,7 @@ function mijn_wc_inline_stijlen() {
         }
         
         
-        /* Verbeterde tekstlayout binnen de dropdown */
-        .ast-site-header-cart .widget_shopping_cart,
-        .ast-header-cart-flyout .ast-mini-cart-wrap {
-             white-space: normal !important;
-             word-wrap: break-word;
-        }
-        
-        /* Optioneel: uitlijning van knoppen */
-        .ast-site-header-cart .woocommerce-mini-cart__buttons a {
-             display: inline-block;
-             width: 100%;
-             text-align: center;
-        }
-        
-        
-        /* Targets the individual dropdown items for safety, in case they are translucent */
-        .main-navigation .menu-item-has-children .sub-menu li {
-             /* Ensures individual links have a solid background */
-             background-color: transparent !important;
-        }
-        
-        /* Constante Teal Neon Gloed op de Vorm van het Logo (HEFTIG) */
-        .custom-logo {
-             transition: all 0.3s ease;
-              
-             /* Basis Gloed: Bepaalt hoe fel en breed de gloed is */
-             filter: drop-shadow(0 0 15px rgba(0, 128, 128, 1.0)); 
-              
-             /* Zorgt ervoor dat het logo niet ongewenst meebeweegt (uit eerdere tests) */
-             transform: none !important; 
-        }
+
         
         
         /* 1. Verminder de verticale afstand tussen de productrijen.
@@ -178,8 +176,8 @@ function mijn_wc_inline_stijlen() {
         }
         
         
-        /* Media Query: Schakelt de absolute positionering uit op schermen kleiner dan 768px (Mobiel/Tablet) */
-        @media (max-width: 768px) {
+     /* Media Query: Schakelt de absolute positionering uit op schermen kleiner dan 1200px */
+     @media (max-width: 1200px) {
               
              /* 1. Reset de sorteer-dropdown naar de normale flow */
              .woocommerce-ordering {
@@ -237,8 +235,10 @@ function mijn_wc_inline_stijlen() {
         }
     ";
     
-    // Voeg de CSS toe met een inline block
-    echo '<style type="text/css">' . $custom_css . '</style>';
+     // Voeg de CSS toe met een inline block
+     echo '<style type="text/css">' . $custom_css . '</style>';
+     // Mark the document when JS is ready so the menu can fade in without causing CLS
+     echo '<script>document.addEventListener("DOMContentLoaded", function(){document.documentElement.classList.add("js-menu-ready");});</script>';
 }
 
 // Haak de functie aan de 'wp_head' actie om de CSS in de <head> te plaatsen.

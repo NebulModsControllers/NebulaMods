@@ -88,13 +88,7 @@ jQuery(function($) {
         // U kunt refreshCartFragments() hier optioneel toevoegen voor de zekerheid.
     });
 
-    // Handle Astra minicart fragment refresh (from wcIroSettings)
-    if (typeof wcIroSettings !== 'undefined' && wcIroSettings.minicart_selectors) {
-        var selectors = wcIroSettings.minicart_selectors.join(', ');
-        $(document).on('click', selectors, function() {
-            $('body').trigger('wc_fragment_refresh');
-        });
-    }
+    // Minicart fragment refresh helper removed (no header-specific selectors)
     
     // Initialiseer bij laden
     var initialAdjustment = calculateTotalPriceAdjustment();

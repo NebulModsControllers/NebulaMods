@@ -24,7 +24,7 @@
 - Option UID format: `<term_id>_<index>` (useful for cross-referencing overrides in code).
 - Value mapping: frontend uses an `activeIndex` (0..N) that does NOT equal the option’s original index when disabled options exist — the PHP correctly maps activeIndex -> actual index by iterating and skipping disabled entries.
 - Currency & formatting: plugin assumes Euro formatting (comma as decimal separator in JS formatter). Keep this in mind when changing formatting.
-- Astra integration: preloads and re-adds `fontello.woff2`, dequeues `astra-icon-fonts`, and forces a minicart fragment refresh on certain clicks. Tests should run with Astra (or replicate selectors) to confirm behavior.
+<!-- Astra/header-specific integration notes removed from this guide -->
 - Security: save handlers (term and product meta) do not use nonces or capability checks in code as-is — treat as a discovered fact and be deliberate if you modify it.
 
 ## How to validate & debug (developer workflow) 🧪
